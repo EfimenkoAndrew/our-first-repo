@@ -2,4 +2,5 @@ Here is after merge example.
 No FF example 
 Here is the msg1!
 Here is the msg2!
-Here is the VS Code msg1!
+Here is the VS Code msg 2!
+Here is the VS Code msg 1!
