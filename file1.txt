@@ -1,6 +1,1 @@
-mymethod()
-{
-i++;
-}
-
-Hello!
+Some update!
