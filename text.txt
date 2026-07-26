@@ -8,4 +8,4 @@ Here is the conflict MSG1!
 Here is the conflict MSG2!
 
 
-master commit!
+master commit2!
