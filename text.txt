@@ -4,3 +4,4 @@ Here is the msg1!
 Here is the msg2!
 Here is the VS Code msg 2!
 Here is the VS Code msg 1!
+Here is the console MSG1!
