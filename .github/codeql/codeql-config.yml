@@ -1,0 +1,49 @@
+# ==============================================================================
+# CodeQL analysis configuration
+# ==============================================================================
+# Referenced from .github/workflows/codeql.yml via `config-file:`. This is
+# where repo-specific tuning lives, kept separate from the workflow so the
+# "when/how CI runs" logic (workflow) stays readable apart from "what CodeQL
+# should actually look at" (this file).
+# ==============================================================================
+
+name: "WebApplication1 CodeQL config"
+
+# ------------------------------------------------------------------------------
+# QUERY PACKS
+# ------------------------------------------------------------------------------
+# The workflow already requests "security-extended" via the `queries:` input
+# on the init step. We list it again here so this file is self-describing —
+# anyone opening just this config can see the effective query set without
+# also having to read the workflow. Duplicate entries are de-duplicated by
+# CodeQL, so this is safe.
+#
+# Query suite tiers, from narrowest to broadest:
+#   - "default"            : highest-confidence, lowest false-positive rate.
+#   - "security-extended"  : adds many more CWE categories & taint-tracking
+#                             sinks; more results, some may need triage.
+#   - "security-and-quality": security-extended + general code-quality
+#                             (non-security) lints. Not used here — we only
+#                             care about security signal for this project.
+queries:
+  - uses: security-extended
+
+# ------------------------------------------------------------------------------
+# PATH FILTERS
+# ------------------------------------------------------------------------------
+# `paths` / `paths-ignore` control what source CodeQL extracts and queries.
+# This matters for both noise and scan time: build output and IDE metadata
+# are never something we want findings against, and skipping them keeps the
+# analysis faster.
+paths:
+  - WebApplication1
+
+paths-ignore:
+  # Compiled output — not source, and duplicates whatever findings exist in
+  # the real source anyway.
+  - '**/bin/**'
+  - '**/obj/**'
+  # JetBrains Rider project metadata — not application code.
+  - '**/.idea/**'
+  # Nothing under here is source we maintain.
+  - '**/*.designer.cs'

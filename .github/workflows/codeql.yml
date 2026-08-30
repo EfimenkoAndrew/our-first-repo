@@ -1,0 +1,137 @@
+# ==============================================================================
+# CodeQL — ADVANCED (non-default) setup
+# ==============================================================================
+# GitHub offers two ways to turn on CodeQL scanning:
+#
+#   1. "Default setup" — a couple of clicks in Settings > Code security >
+#      Code scanning. GitHub auto-detects the language(s), auto-builds the
+#      project, and hides the workflow from you entirely. Fast, but you can't
+#      tune the query suite, the build steps, the trigger schedule, or the
+#      analyzed paths.
+#
+#   2. "Advanced setup" — you own the workflow file yourself (this file).
+#      That's what we want here: this project intentionally contains
+#      vulnerable demo endpoints (see WebApplication1/CodeQlExamples), and we
+#      want the *security-extended* query pack (more CWE coverage than the
+#      handful of default queries) plus full control over what gets built
+#      and scanned.
+#
+# If GitHub's "default setup" is still enabled for this repo in the UI, it
+# will conflict with this workflow. Go to
+# Settings > Code security > Code scanning > CodeQL analysis > "Switch to
+# advanced" (or disable default setup) before this workflow's runs will be
+# accepted as the repo's code scanning source.
+# ==============================================================================
+
+name: "CodeQL Advanced Analysis"
+
+# ------------------------------------------------------------------------------
+# WHEN THIS WORKFLOW RUNS
+# ------------------------------------------------------------------------------
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    # Only re-scan PRs that target the main branch — keeps CI load down for
+    # PRs opened between two feature branches.
+    branches: [ "master" ]
+  schedule:
+    # Belt-and-braces: even if nobody pushes code, re-run weekly so newly
+    # published CodeQL query updates (new CWE coverage, fewer false
+    # positives, etc.) still get applied to the existing codebase.
+    # Cron is UTC: 03:17 every Monday. The odd minute avoids the top-of-hour
+    # stampede on GitHub's shared runners.
+    - cron: '17 3 * * 1'
+  # Lets you trigger a scan on demand from the Actions tab without waiting
+  # for a push or the weekly schedule.
+  workflow_dispatch:
+
+# ------------------------------------------------------------------------------
+# PERMISSIONS
+# ------------------------------------------------------------------------------
+# Least-privilege: the job only needs to read the repo and check out code,
+# plus write access to the "security-events" API so it can upload SARIF
+# results to the repo's Code Scanning tab.
+permissions:
+  contents: read           # checkout the source
+  actions: read             # allow the CodeQL action to read workflow metadata
+  security-events: write    # upload scan results (SARIF) to Code Scanning
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      # fail-fast: false so that, if we ever add a second language to the
+      # matrix, one language's failure doesn't cancel the others mid-scan.
+      fail-fast: false
+      matrix:
+        # Only C# today (this is a .NET Web API project). Add more entries
+        # here (e.g. "javascript-typescript") if the repo grows other
+        # languages that CodeQL supports.
+        language: [ 'csharp' ]
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Get the source onto the runner.
+      # ------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2. .NET SDK — required because we build the project ourselves
+      #    (build-mode: manual, see step 4). CodeQL's C# extractor observes
+      #    the actual compiler invocations during the build to understand
+      #    the code, so the SDK version here should match what the project
+      #    targets (net10.0, see WebApplication1.csproj).
+      # ------------------------------------------------------------------
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # ------------------------------------------------------------------
+      # 3. Initialize the CodeQL engine for this language.
+      #    - queries: security-extended pulls in a broader CWE-coverage
+      #      query pack than the small "default" set (which is tuned for
+      #      low false positives above all else). Extended adds things
+      #      like additional taint-tracking sinks, at the cost of a few
+      #      more results you may need to triage.
+      #    - config-file: points at repo-specific tuning (path filters,
+      #      extra query packs) kept in its own file for readability.
+      # ------------------------------------------------------------------
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
+          # build-mode: manual — we drive the dotnet build ourselves in the
+          # next step instead of letting the action's "autobuild" heuristic
+          # guess how to build the project. This is the most reliable
+          # option for .csproj/.sln layouts like this one and matches
+          # exactly what CI would otherwise run.
+          build-mode: manual
+
+      # ------------------------------------------------------------------
+      # 4. Build the project. CodeQL's C# extractor hooks into this build
+      #    (via the compiler tracing it injected in the "init" step above)
+      #    to construct the database it will query. If the build fails,
+      #    the scan has nothing to analyze, so this step is not optional.
+      # ------------------------------------------------------------------
+      - name: Build solution
+        run: |
+          dotnet restore WebApplication1/WebApplication1.sln
+          dotnet build WebApplication1/WebApplication1.sln --no-restore --configuration Release
+
+      # ------------------------------------------------------------------
+      # 5. Run the actual analysis and upload results as SARIF. Findings
+      #    show up under the repo's "Security > Code scanning alerts" tab,
+      #    and as annotations on the PR that triggered the run.
+      # ------------------------------------------------------------------
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
