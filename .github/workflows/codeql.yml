@@ -30,11 +30,11 @@ name: "CodeQL Advanced Analysis"
 # ------------------------------------------------------------------------------
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "develop" ]
   pull_request:
     # Only re-scan PRs that target the main branch — keeps CI load down for
     # PRs opened between two feature branches.
-    branches: [ "master" ]
+    branches: [ "master", "develop" ]
   schedule:
     # Belt-and-braces: even if nobody pushes code, re-run weekly so newly
     # published CodeQL query updates (new CWE coverage, fewer false
