@@ -1,16 +1,31 @@
-using System;
-using System.IO;
+using Microsoft.AspNetCore.Mvc;
+using System.Data.SqlClient;
 
-class Program
+[ApiController]
+[Route("[controller]")]
+public class UserController : ControllerBase
 {
-    static void Main(string[] args)
+    [HttpGet("search")]
+    public IActionResult Search(string username)
     {
-        // CodeQL flags this as a Path Traversal vulnerability (CWE-22)
-        // because unvalidated user input flows directly into a file system operation.
-        string userInput = args.Length > 0 ? args[0] : "test.txt";
-        string filePath = Path.Combine(@"C:\inetpub\wwwroot", userInput);
+        // CodeQL tracks untrusted 'username' from the HTTP request source 
+        // directly into the SqlCommand string concatenation sink (SQL Injection).
+        string connectionString = "Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassword;";
         
-        string content = File.ReadAllText(filePath);
-        Console.WriteLine(content);
+        using (var connection = new SqlConnection(connectionString))
+        {
+            connection.Open();
+            string query = "SELECT * FROM Users WHERE Username = '" + username + "'";
+            
+            using (var command = new SqlCommand(query, connection))
+            {
+                using (var reader = command.ExecuteReader())
+                {
+                    // Execution
+                }
+            }
+        }
+        
+        return Ok("Search completed.");
     }
 }
